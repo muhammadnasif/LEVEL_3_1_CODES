@@ -1,0 +1,374 @@
+.MODEL SMALL
+
+.STACK 100H
+
+.DATA
+    CR EQU 0DH
+    LF EQU 0AH
+    
+    BR DB CR,LF, '$'
+    
+    NUM_1 DW 0
+    NUM_2 DW 0
+    NUM_TEMP DW 0
+    COUNTER_DIGIT DW 0
+    CNT_1 DW 0
+    CNT_2 DW 0
+    RESULT_16 DW 0
+    RESULT_8 DB 0
+    RESULT_DIGIT DW 0
+    SIGN_1 DW '+'
+    SIGN_2 DW '+'
+    SIGN_TEMP DW 0
+    START DW 0
+
+    OPERATOR DB 0
+    
+    
+.CODE
+
+
+
+NUMBER_INPUT PROC
+    
+INPUT:    
+    MOV AH,1
+    INT 21H
+    CMP AL,'q'
+    JZ  END_NUMBER_INPUT
+    CMP AL,'-'
+    JZ NEG_NUM
+    CMP AL,'+'
+    JZ END_NUMBER_INPUT
+    CMP AL,'*'
+    JZ END_NUMBER_INPUT
+    CMP AL,'/'
+    JZ END_NUMBER_INPUT
+    CMP AL,21
+    JB END_NUMBER_INPUT
+    
+    JMP CONTINUE
+
+NEG_NUM:
+    CMP START,1
+    JZ END_NUMBER_INPUT
+
+    CMP START,0         ; 0 -> CAN TAKE NEG NUM
+    JNE INPUT
+    
+NEG_NUM_DO:
+    MOV START,1   
+    MOV CX,'-'
+    MOV SIGN_1,CX
+    JMP INPUT
+
+
+CONTINUE:        
+    CMP AL,'0'
+    JB  INPUT
+    CMP AL,'9'
+    JA INPUT
+    
+    
+    SUB AL,48D
+    MOV BH,AL       ;INPUT NUMBER IN->BH
+    XOR AX,AX       ;CLEAR REGISTER
+    MOV AX,10D      ;AX = 10
+    MUL NUM_1       ;AX = AX*NUM_1 = (10)*NUM_1
+    MOV BL,BH
+    XOR BH,BH
+    ADD AX,BX       ;AX = AX+BH
+    
+    MOV NUM_1,AX
+    INC COUNTER_DIGIT 
+    JMP INPUT
+    
+END_NUMBER_INPUT:
+    RET                
+NUMBER_INPUT ENDP
+
+
+
+OPERATOR_INPUT PROC    
+
+OP_INPUT:    
+
+    CMP AL,'+'
+    JZ  OP_PLUS
+    CMP AL,'-'
+    JZ OP_MINUS
+    
+    CMP AL,'*'             ;NEED TO IMPLEMENT THESE 115-118 LINE FUNCTIONS
+    JZ OP_MULTIPLY
+    CMP AL,'/'
+    JZ OP_DIVIDE
+       
+    CMP AL,'q'
+    JZ END_OPERATOR_INPUT
+    JMP OP_INPUT
+    
+OP_PLUS:
+    MOV OPERATOR,'+'
+    JMP END_OPERATOR_INPUT
+    
+OP_MINUS:
+    MOV OPERATOR,'-'
+    JMP END_OPERATOR_INPUT
+
+OP_MULTIPLY:
+    MOV OPERATOR,'*'
+    JMP END_OPERATOR_INPUT
+
+OP_DIVIDE:
+    MOV OPERATOR,'/'
+    JMP END_OPERATOR_INPUT
+ 
+        
+END_OPERATOR_INPUT:    
+    RET
+OPERATOR_INPUT ENDP
+
+
+
+
+PLUS_FUNCTION PROC               ;PLUS_FUNCTION()
+    MOV AX,NUM_1 
+    MOV BX,NUM_2
+    ADD AX,NUM_2
+    MOV RESULT_16,AX    
+    RET
+PLUS_FUNCTION ENDP
+
+
+
+
+MINUS_FUNCTION PROC             ;MINUS_FUNCTION()
+    MOV AX,NUM_1
+    SUB AX,NUM_2
+    MOV RESULT_16,AX
+    
+    RET
+MINUS_FUNCTION ENDP
+
+
+MULTIPLY_FUNCTION PROC    
+    MOV AX,NUM_1
+    MUL NUM_2
+    MOV RESULT_16, AX
+    RET
+MULTIPLY_FUNCTION ENDP
+
+
+
+DIVISION_FUNCTION PROC
+    MOV BX,NUM_2
+    MOV AX,NUM_1
+    ;CBW
+    IDIV BL
+    MOV AH,0
+    ;MOV RESULT_8,AL
+    TEST AL,128
+    JS NEG_IN_DIV
+    MOV RESULT_16,AX 
+    JMP END_DIV 
+     
+NEG_IN_DIV:
+    MOV AH,255
+    MOV RESULT_16,AX    
+
+END_DIV:    
+    RET
+DIVISION_FUNCTION ENDP
+
+
+PRINT_RESULT PROC
+OUTPUT_RES:
+    
+    MOV DX,0
+    MOV AX,0
+    
+    MOV AX,RESULT_16    ;AX = NUM_1
+    MOV BX,10       
+    DIV BX
+    
+    MOV RESULT_16,AX
+    PUSH DX
+    INC RESULT_DIGIT
+    CMP RESULT_16,0B
+    JZ  PRINT_RES
+    
+    JMP OUTPUT_RES
+    
+PRINT_RES:
+    MOV CX,RESULT_DIGIT            ;INITIALIZING COUNTER_DIGIT BEFORE CALLING PRINT_RESULT
+    MOV AH,2
+    
+    
+    CMP SIGN_TEMP,'-'
+    JZ  PRINT_NEG_SIGN
+    JMP FOR_LOOP_RESULT
+    
+PRINT_NEG_SIGN:
+    MOV DL,'-'
+    INT 21H
+    
+
+FOR_LOOP_RESULT:    
+    POP DX
+    ADD DX,48
+    INT 21H
+    LOOP FOR_LOOP_RESULT    
+    
+    
+    
+    
+    RET 
+PRINT_RESULT ENDP
+
+
+
+
+
+
+
+
+
+
+
+MAIN PROC
+    MOV DX,0
+    MOV NUM_1,DX
+    
+    MOV CX,'+'
+    MOV SIGN_1,CX
+    MOV SIGN_2,CX
+    
+    CALL NUMBER_INPUT
+    
+    
+    MOV CX,0                    ;STORE COUNTER IN TEMP VARIABLE
+    MOV CX,COUNTER_DIGIT
+    MOV CNT_1,CX
+    
+    MOV CX,0
+    MOV COUNTER_DIGIT,CX
+    
+    
+    MOV CX,NUM_1
+    MOV NUM_TEMP,CX             ;NUM_1 NOW IN NUM_TEMP
+    MOV CX,0
+    MOV NUM_1,CX
+    
+    MOV CX,SIGN_1
+    MOV SIGN_TEMP,CX
+    
+    
+    
+    CALL OPERATOR_INPUT
+    
+    
+    MOV SIGN_1,'+'
+    MOV START,0
+    
+    CALL NUMBER_INPUT
+    
+    MOV CX,0                    ;STORE COUNTER IN TEMP VARIABLE
+    MOV CX,COUNTER_DIGIT
+    MOV CNT_2,CX
+    
+    MOV CX,0
+    MOV COUNTER_DIGIT,CX
+    
+    
+            
+    MOV CX,NUM_1
+    MOV NUM_2,CX
+    MOV CX,0
+    MOV CX,NUM_TEMP
+    MOV NUM_1,CX                ;NUM_1 NOW IN ITS OWN PLACE
+    
+    MOV CX,SIGN_1
+    MOV SIGN_2,CX
+    MOV CX,SIGN_TEMP
+    MOV SIGN_1,CX
+    
+    MOV SIGN_TEMP,'+'
+    
+    
+CHECK_1:
+    CMP SIGN_1,'-'
+    JZ NEG_NUM_1
+
+CHECK_2:
+    CMP SIGN_2,'-'
+    JZ NEG_NUM_2
+    JMP PROCESS
+    
+NEG_NUM_1:
+    NEG NUM_1
+    JMP CHECK_2
+
+NEG_NUM_2:
+    NEG NUM_2
+    
+
+PROCESS:
+
+    MOV BL,OPERATOR
+
+    CMP OPERATOR,'+'
+    JZ CALL_PLUS
+    CMP OPERATOR,'-'
+    JZ CALL_MINUS
+    CMP OPERATOR,'*'
+    JZ CALL_MULTIPLY
+    CMP OPERATOR,'/'
+    JZ CALL_DIVISION
+    
+
+CALL_MINUS:
+    CALL MINUS_FUNCTION
+    JMP PROCESS_CONTINUE
+    
+CALL_MULTIPLY:
+    CALL MULTIPLY_FUNCTION
+    JMP PROCESS_CONTINUE
+
+CALL_PLUS:
+    CALL PLUS_FUNCTION
+    JMP PROCESS_CONTINUE
+
+CALL_DIVISION:
+    CALL DIVISION_FUNCTION
+    JMP PROCESS_CONTINUE
+
+PROCESS_CONTINUE:    
+    
+    MOV CX,-32768
+    TEST CX,RESULT_16
+    JS TURN_NEG_MODE
+    JMP NEXT 
+
+TURN_NEG_MODE:
+    NEG RESULT_16
+    MOV SIGN_TEMP,'-'
+    
+
+NEXT:
+    MOV DL,LF
+    MOV AH,2
+    INT 21H
+    MOV DL,'='
+    INT 21H
+    MOV AH,2               
+    CALL PRINT_RESULT
+        
+    
+    
+
+END:          
+    MOV AH,4CH
+    INT 21H
+     
+MAIN ENDP
+    END MAIN
